@@ -3,16 +3,23 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertBookingSchema, type TeeTimeSlot, type PricingRule } from "@shared/schema";
+import PaymentCheckout from "./payment-checkout";
+
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY 
+  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
+  : null;
 
 const bookingFormSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -110,19 +117,42 @@ export default function BookingForm() {
     return (basePrice * totalMultiplier * watchedPlayers).toFixed(2);
   }, [selectedSlot, pricingRules, selectedDate, watchedPlayers]);
 
+  const [showPayment, setShowPayment] = useState(false);
+  const [clientSecret, setClientSecret] = useState("");
+  const [pendingBookingId, setPendingBookingId] = useState("");
+
   const createBookingMutation = useMutation({
     mutationFn: async (data: z.infer<typeof insertBookingSchema>) => {
       return await apiRequest("/api/bookings", "POST", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/courses", user?.courseId, "bookings"] });
-      toast({
-        title: "Booking Confirmed!",
-        description: "Your tee time has been successfully booked.",
-      });
-      form.reset();
+    onSuccess: async (booking: any) => {
+      if (!stripePromise) {
+        toast({
+          title: "Payment Not Available",
+          description: "Stripe payment is not configured. Please contact support.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create payment intent
+      try {
+        const paymentResponse = await apiRequest("/api/create-payment-intent", "POST", {
+          bookingId: booking.id,
+        });
+        
+        setClientSecret(paymentResponse.clientSecret);
+        setPendingBookingId(booking.id);
+        setShowPayment(true);
+      } catch (error) {
+        toast({
+          title: "Payment Setup Failed",
+          description: error?.message || "Failed to initialize payment. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Booking Failed",
         description: error?.message || "Failed to create booking. Please try again.",
@@ -143,16 +173,30 @@ export default function BookingForm() {
 
     createBookingMutation.mutate({
       teeTimeSlotId: values.teeTimeSlotId,
-      customerId: user.id,
       playerCount: values.playerCount,
-      totalPrice: calculatedPrice,
       customerName: values.customerName,
       customerEmail: values.customerEmail,
       customerPhone: values.customerPhone || null,
       notes: values.notes || null,
-      status: "confirmed",
-      paymentStatus: "pending",
+    } as any);
+  };
+
+  const handlePaymentSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/courses", user?.courseId, "bookings"] });
+    setShowPayment(false);
+    setClientSecret("");
+    setPendingBookingId("");
+    form.reset();
+    toast({
+      title: "Booking Confirmed!",
+      description: "Your tee time has been successfully booked and paid for.",
     });
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
+    setClientSecret("");
+    setPendingBookingId("");
   };
 
   const availableSlots = teeTimeSlots.filter(slot => slot.isAvailable);
@@ -333,10 +377,29 @@ export default function BookingForm() {
             disabled={createBookingMutation.isPending || !selectedSlot}
             data-testid="button-book-tee-time"
           >
-            {createBookingMutation.isPending ? "Booking..." : "Book Now"}
+            {createBookingMutation.isPending ? "Processing..." : "Continue to Payment"}
           </Button>
         </form>
       </Form>
+
+      {/* Payment Dialog */}
+      <Dialog open={showPayment} onOpenChange={(open) => !open && handlePaymentCancel()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle data-testid="title-payment-dialog">Complete Payment</DialogTitle>
+          </DialogHeader>
+          {clientSecret && (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <PaymentCheckout
+                bookingId={pendingBookingId}
+                amount={calculatedPrice}
+                onSuccess={handlePaymentSuccess}
+                onCancel={handlePaymentCancel}
+              />
+            </Elements>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

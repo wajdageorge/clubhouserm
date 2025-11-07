@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
@@ -11,6 +12,13 @@ import {
   insertWeatherDataSchema 
 } from "@shared/schema";
 import { z } from "zod";
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-11-20.acacia",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -146,9 +154,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/bookings', async (req, res) => {
+  app.post('/api/bookings', isAuthenticated, async (req, res) => {
     try {
-      const validated = insertBookingSchema.parse(req.body);
+      const userId = (req as any).user.claims.sub;
+      
+      // Parse incoming data (without totalPrice from client)
+      const { teeTimeSlotId, playerCount, customerName, customerEmail, customerPhone, notes } = req.body;
+      
+      // Fetch tee time slot to get base price
+      const teeTimeSlot = await storage.getTeeTimeSlot(teeTimeSlotId);
+      if (!teeTimeSlot) {
+        return res.status(404).json({ message: "Tee time slot not found" });
+      }
+
+      if (!teeTimeSlot.isAvailable) {
+        return res.status(400).json({ message: "Tee time slot is not available" });
+      }
+
+      // Fetch course to get pricing rules
+      const user = await storage.getUser(userId);
+      if (!user?.courseId) {
+        return res.status(400).json({ message: "User not associated with a course" });
+      }
+
+      const pricingRules = await storage.getPricingRulesByCourse(user.courseId);
+      
+      // Calculate price server-side
+      const basePrice = parseFloat(teeTimeSlot.currentPrice);
+      let totalMultiplier = 1.0;
+
+      const slotDate = new Date(teeTimeSlot.date);
+      const dayOfWeek = slotDate.getDay();
+      const [hours] = teeTimeSlot.time.split(':').map(Number);
+
+      // Apply active pricing rules
+      pricingRules
+        .filter(rule => rule.isActive)
+        .forEach(rule => {
+          const modifier = parseFloat(rule.modifier);
+          const conditions = rule.conditions as any;
+
+          switch (rule.ruleType) {
+            case 'time_based':
+              if (conditions?.startHour !== undefined && conditions?.endHour !== undefined) {
+                if (hours >= conditions.startHour && hours < conditions.endHour) {
+                  totalMultiplier *= modifier;
+                }
+              }
+              break;
+
+            case 'day_based':
+              if (conditions?.days && Array.isArray(conditions.days)) {
+                if (conditions.days.includes(dayOfWeek)) {
+                  totalMultiplier *= modifier;
+                }
+              }
+              break;
+          }
+        });
+
+      // Calculate final price
+      const totalPrice = (basePrice * totalMultiplier * playerCount).toFixed(2);
+
+      // Create booking with server-calculated price
+      const validated = insertBookingSchema.parse({
+        teeTimeSlotId,
+        customerId: userId,
+        playerCount,
+        totalPrice,
+        customerName,
+        customerEmail,
+        customerPhone,
+        notes,
+        status: "pending",
+        paymentStatus: "pending",
+      });
+
       const booking = await storage.createBooking(validated);
       res.status(201).json(booking);
     } catch (error) {
@@ -287,6 +368,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create weather data" });
+    }
+  });
+
+  // Stripe payment routes
+  app.post('/api/create-payment-intent', isAuthenticated, async (req, res) => {
+    try {
+      const { bookingId } = req.body;
+      
+      if (!bookingId) {
+        return res.status(400).json({ message: "Booking ID is required" });
+      }
+
+      // Fetch booking from database to get the actual amount
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Verify booking belongs to authenticated user or is accessible
+      const userId = (req as any).user.claims.sub;
+      if (booking.customerId !== userId) {
+        return res.status(403).json({ message: "Unauthorized to create payment for this booking" });
+      }
+
+      // Use server-side amount from booking
+      const amount = parseFloat(booking.totalPrice);
+      if (amount <= 0) {
+        return res.status(400).json({ message: "Invalid booking amount" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "usd",
+        metadata: {
+          bookingId: booking.id,
+          customerId: booking.customerId,
+          teeTimeSlotId: booking.teeTimeSlotId,
+        },
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error("Error creating payment intent:", error);
+      res.status(500).json({ message: "Error creating payment intent: " + error.message });
+    }
+  });
+
+  app.post('/api/confirm-payment', isAuthenticated, async (req, res) => {
+    try {
+      const { bookingId, paymentIntentId } = req.body;
+
+      if (!bookingId || !paymentIntentId) {
+        return res.status(400).json({ message: "Missing booking ID or payment intent ID" });
+      }
+
+      // Fetch booking from database
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Verify booking belongs to authenticated user
+      const userId = (req as any).user.claims.sub;
+      if (booking.customerId !== userId) {
+        return res.status(403).json({ message: "Unauthorized to confirm payment for this booking" });
+      }
+
+      // Verify payment intent with Stripe
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      // Verify payment succeeded
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment has not succeeded" });
+      }
+
+      // Verify amount matches booking
+      const expectedAmount = Math.round(parseFloat(booking.totalPrice) * 100);
+      if (paymentIntent.amount !== expectedAmount) {
+        return res.status(400).json({ message: "Payment amount mismatch" });
+      }
+
+      // Verify metadata matches
+      if (paymentIntent.metadata.bookingId !== bookingId) {
+        return res.status(400).json({ message: "Payment intent does not match booking" });
+      }
+
+      // Update booking with payment information
+      await storage.updateBooking(bookingId, {
+        paymentStatus: 'paid',
+        paymentIntentId,
+        status: 'confirmed',
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error confirming payment:", error);
+      res.status(500).json({ message: "Error confirming payment: " + error.message });
     }
   });
 

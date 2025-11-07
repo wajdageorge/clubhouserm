@@ -264,6 +264,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer routes
+  app.get('/api/courses/:courseId/customers', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's customers" });
+      }
+
+      const customers = await storage.getUsersByCourse(req.params.courseId);
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  app.get('/api/customers/:customerId/bookings', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Fetch the customer to verify they belong to the same course
+      const customer = await storage.getUser(req.params.customerId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Verify customer belongs to the same course as the authenticated user
+      if (!user?.courseId || customer.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This customer belongs to a different course" });
+      }
+
+      const bookings = await storage.getBookingsByCustomer(req.params.customerId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching customer bookings:", error);
+      res.status(500).json({ message: "Failed to fetch customer bookings" });
+    }
+  });
+
   // Pricing rules routes
   app.get('/api/courses/:courseId/pricing-rules', isAuthenticated, async (req, res) => {
     try {

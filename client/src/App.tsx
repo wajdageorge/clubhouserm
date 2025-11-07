@@ -13,6 +13,9 @@ import Pricing from "@/pages/pricing";
 import Analytics from "@/pages/analytics";
 import Competitors from "@/pages/competitors";
 import Settings from "@/pages/settings";
+import CourseDetails from "@/pages/course-details";
+import HoleInformation from "@/pages/holes";
+import StaffManagement from "@/pages/staff";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,6 +33,9 @@ function Router() {
           <Route path="/analytics" component={Analytics} />
           <Route path="/competitors" component={Competitors} />
           <Route path="/settings" component={Settings} />
+          <Route path="/course-details" component={CourseDetails} />
+          <Route path="/holes" component={HoleInformation} />
+          <Route path="/staff" component={StaffManagement} />
         </>
       )}
       <Route component={NotFound} />

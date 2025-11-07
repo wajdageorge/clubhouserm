@@ -29,10 +29,8 @@ export default function DemandForecast() {
   const [maxDemandCap, setMaxDemandCap] = useState(100);
   const [forecasts, setForecasts] = useState<DemandForecast[]>([]);
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-  
   const { data: teeTimeSlots, isLoading } = useQuery<TeeTimeSlot[]>({
-    queryKey: ["/api/courses", user?.courseId, "tee-times", today],
+    queryKey: ["/api/courses", user?.courseId, "tee-times"],
     enabled: !!user?.courseId,
   });
 

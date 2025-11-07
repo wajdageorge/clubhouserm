@@ -82,10 +82,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/courses/:id', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
       const course = await storage.getCourse(req.params.id);
       if (!course) {
         return res.status(404).json({ message: "Course not found" });
       }
+
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.id) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course" });
+      }
+
       res.json(course);
     } catch (error) {
       console.error("Error fetching course:", error);
@@ -96,6 +105,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tee time routes
   app.get('/api/courses/:courseId/tee-times', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's tee times" });
+      }
+
       const { courseId } = req.params;
       const { date } = req.query;
       const teeTimeSlots = await storage.getTeeTimeSlotsByCourse(courseId, date as string);
@@ -108,6 +125,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/courses/:courseId/tee-times', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to create tee times for this course" });
+      }
+
       const validated = insertTeeTimeSlotSchema.parse({
         ...req.body,
         courseId: req.params.courseId
@@ -125,8 +150,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/tee-times/:id', isAuthenticated, async (req, res) => {
     try {
-      const teeTimeSlot = await storage.updateTeeTimeSlot(req.params.id, req.body);
-      res.json(teeTimeSlot);
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Fetch tee time to verify course ownership
+      const teeTimeSlot = await storage.getTeeTimeSlot(req.params.id);
+      if (!teeTimeSlot) {
+        return res.status(404).json({ message: "Tee time slot not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || teeTimeSlot.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This tee time belongs to a different course" });
+      }
+
+      const updatedSlot = await storage.updateTeeTimeSlot(req.params.id, req.body);
+      res.json(updatedSlot);
     } catch (error) {
       console.error("Error updating tee time:", error);
       res.status(500).json({ message: "Failed to update tee time" });
@@ -135,6 +174,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/tee-times/:id', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Fetch tee time to verify course ownership
+      const teeTimeSlot = await storage.getTeeTimeSlot(req.params.id);
+      if (!teeTimeSlot) {
+        return res.status(404).json({ message: "Tee time slot not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || teeTimeSlot.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This tee time belongs to a different course" });
+      }
+
       await storage.deleteTeeTimeSlot(req.params.id);
       res.status(204).send();
     } catch (error) {
@@ -146,6 +199,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking routes
   app.get('/api/courses/:courseId/bookings', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's bookings" });
+      }
+
       const bookings = await storage.getBookingsByCourse(req.params.courseId);
       res.json(bookings);
     } catch (error) {
@@ -175,6 +236,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user?.courseId) {
         return res.status(400).json({ message: "User not associated with a course" });
+      }
+
+      // Verify tee time belongs to user's course
+      if (teeTimeSlot.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This tee time belongs to a different course" });
       }
 
       const pricingRules = await storage.getPricingRulesByCourse(user.courseId);
@@ -243,10 +309,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/bookings/:id', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
       const booking = await storage.getBooking(req.params.id);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
+
+      // Fetch tee time to verify course ownership
+      const teeTimeSlot = await storage.getTeeTimeSlot(booking.teeTimeSlotId);
+      if (!teeTimeSlot) {
+        return res.status(404).json({ message: "Associated tee time not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || teeTimeSlot.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This booking belongs to a different course" });
+      }
+
       res.json(booking);
     } catch (error) {
       console.error("Error fetching booking:", error);
@@ -256,8 +337,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/bookings/:id', isAuthenticated, async (req, res) => {
     try {
-      const booking = await storage.updateBooking(req.params.id, req.body);
-      res.json(booking);
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      const booking = await storage.getBooking(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Fetch tee time to verify course ownership
+      const teeTimeSlot = await storage.getTeeTimeSlot(booking.teeTimeSlotId);
+      if (!teeTimeSlot) {
+        return res.status(404).json({ message: "Associated tee time not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || teeTimeSlot.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This booking belongs to a different course" });
+      }
+
+      const updatedBooking = await storage.updateBooking(req.params.id, req.body);
+      res.json(updatedBooking);
     } catch (error) {
       console.error("Error updating booking:", error);
       res.status(500).json({ message: "Failed to update booking" });
@@ -310,6 +410,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Pricing rules routes
   app.get('/api/courses/:courseId/pricing-rules', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's pricing rules" });
+      }
+
       const rules = await storage.getPricingRulesByCourse(req.params.courseId);
       res.json(rules);
     } catch (error) {
@@ -320,6 +428,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/courses/:courseId/pricing-rules', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to create pricing rules for this course" });
+      }
+
       const validated = insertPricingRuleSchema.parse({
         ...req.body,
         courseId: req.params.courseId
@@ -337,8 +453,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/pricing-rules/:id', isAuthenticated, async (req, res) => {
     try {
-      const rule = await storage.updatePricingRule(req.params.id, req.body);
-      res.json(rule);
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      // Fetch pricing rule to verify course ownership
+      const rule = await storage.getPricingRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Pricing rule not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || rule.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This pricing rule belongs to a different course" });
+      }
+
+      const updatedRule = await storage.updatePricingRule(req.params.id, req.body);
+      res.json(updatedRule);
     } catch (error) {
       console.error("Error updating pricing rule:", error);
       res.status(500).json({ message: "Failed to update pricing rule" });
@@ -348,6 +478,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Competitor routes
   app.get('/api/courses/:courseId/competitors', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's competitors" });
+      }
+
       const competitors = await storage.getCompetitorsByCourse(req.params.courseId);
       res.json(competitors);
     } catch (error) {
@@ -358,6 +496,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/courses/:courseId/competitors', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to create competitors for this course" });
+      }
+
       const validated = insertCompetitorSchema.parse({
         ...req.body,
         courseId: req.params.courseId
@@ -376,6 +522,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Competitor pricing routes
   app.get('/api/competitors/:competitorId/pricing', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      // Fetch competitor to verify course ownership
+      const competitor = await storage.getCompetitor(req.params.competitorId);
+      if (!competitor) {
+        return res.status(404).json({ message: "Competitor not found" });
+      }
+
+      // Verify user owns this course
+      if (!user?.courseId || competitor.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied: This competitor belongs to a different course" });
+      }
+
       const { date } = req.query;
       const pricing = await storage.getCompetitorPricing(req.params.competitorId, date as string);
       res.json(pricing);
@@ -386,8 +546,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Weather routes
-  app.get('/api/courses/:courseId/weather', async (req, res) => {
+  app.get('/api/courses/:courseId/weather', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to view this course's weather data" });
+      }
+
       const { date } = req.query;
       const weather = await storage.getWeatherData(req.params.courseId, date as string);
       res.json(weather);
@@ -399,6 +567,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/courses/:courseId/weather', isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Verify user owns this course
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied: You don't have permission to create weather data for this course" });
+      }
+
       const validated = insertWeatherDataSchema.parse({
         ...req.body,
         courseId: req.params.courseId

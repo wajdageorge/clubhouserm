@@ -56,12 +56,14 @@ export interface IStorage {
   deleteBooking(id: string): Promise<void>;
 
   // Pricing rule operations
+  getPricingRule(id: string): Promise<PricingRule | undefined>;
   getPricingRulesByCourse(courseId: string): Promise<PricingRule[]>;
   createPricingRule(rule: InsertPricingRule): Promise<PricingRule>;
   updatePricingRule(id: string, rule: Partial<InsertPricingRule>): Promise<PricingRule>;
   deletePricingRule(id: string): Promise<void>;
 
   // Competitor operations
+  getCompetitor(id: string): Promise<Competitor | undefined>;
   getCompetitorsByCourse(courseId: string): Promise<Competitor[]>;
   createCompetitor(competitor: InsertCompetitor): Promise<Competitor>;
   updateCompetitor(id: string, competitor: Partial<InsertCompetitor>): Promise<Competitor>;
@@ -231,6 +233,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Pricing rule operations
+  async getPricingRule(id: string): Promise<PricingRule | undefined> {
+    const [rule] = await db.select().from(pricingRules).where(eq(pricingRules.id, id));
+    return rule;
+  }
+
   async getPricingRulesByCourse(courseId: string): Promise<PricingRule[]> {
     return await db
       .select()
@@ -258,6 +265,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Competitor operations
+  async getCompetitor(id: string): Promise<Competitor | undefined> {
+    const [competitor] = await db.select().from(competitors).where(eq(competitors.id, id));
+    return competitor;
+  }
+
   async getCompetitorsByCourse(courseId: string): Promise<Competitor[]> {
     return await db
       .select()

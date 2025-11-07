@@ -21,8 +21,8 @@ export default function RevenueAnalytics() {
 
   return (
     <div className="mt-8">
-      <Card className="p-6">
-        <CardHeader className="pb-6">
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Revenue Analytics</CardTitle>
             <Select defaultValue="7days">

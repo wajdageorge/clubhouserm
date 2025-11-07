@@ -53,8 +53,8 @@ export default function PricingEngine() {
 
   return (
     <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <Card className="p-6">
-        <CardHeader className="pb-4">
+      <Card>
+        <CardHeader>
           <CardTitle>Dynamic Pricing Rules</CardTitle>
         </CardHeader>
         <CardContent>
@@ -85,15 +85,19 @@ export default function PricingEngine() {
           </div>
           
           <div className="mt-6">
-            <Button className="w-full" data-testid="button-configure-pricing">
+            <Button 
+              className="w-full" 
+              data-testid="button-configure-pricing"
+              onClick={() => window.location.href = '/pricing'}
+            >
               Configure Pricing Rules
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="p-6">
-        <CardHeader className="pb-4">
+      <Card>
+        <CardHeader>
           <CardTitle>Customer Booking Interface</CardTitle>
         </CardHeader>
         <CardContent>

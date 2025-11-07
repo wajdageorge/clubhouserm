@@ -10,6 +10,7 @@ import WeatherCard from "@/components/dashboard/weather-card";
 import CompetitorPricing from "@/components/dashboard/competitor-pricing";
 import RevenueAnalytics from "@/components/dashboard/revenue-analytics";
 import PricingEngine from "@/components/dashboard/pricing-engine";
+import DemandForecast from "@/components/dashboard/demand-forecast";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -59,6 +60,11 @@ export default function Dashboard() {
           </div>
 
           <RevenueAnalytics />
+          
+          <div className="mt-8">
+            <DemandForecast />
+          </div>
+          
           <PricingEngine />
         </div>
       </main>

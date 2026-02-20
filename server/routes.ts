@@ -12,6 +12,7 @@ import {
   insertWeatherDataSchema 
 } from "@shared/schema";
 import { z } from "zod";
+import { calculateDynamicPrice, recalculateCoursePricing, runPricingDemo } from "./utils/pricingEngine";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -232,55 +233,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Tee time slot is not available" });
       }
 
-      // Fetch course to get pricing rules
       const user = await storage.getUser(userId);
       if (!user?.courseId) {
         return res.status(400).json({ message: "User not associated with a course" });
       }
 
-      // Verify tee time belongs to user's course
       if (teeTimeSlot.courseId !== user.courseId) {
         return res.status(403).json({ message: "Access denied: This tee time belongs to a different course" });
       }
 
-      const pricingRules = await storage.getPricingRulesByCourse(user.courseId);
-      
-      // Calculate price server-side
-      const basePrice = parseFloat(teeTimeSlot.currentPrice);
-      let totalMultiplier = 1.0;
-
-      const slotDate = new Date(teeTimeSlot.date);
-      const dayOfWeek = slotDate.getDay();
-      const [hours] = teeTimeSlot.time.split(':').map(Number);
-
-      // Apply active pricing rules
-      pricingRules
-        .filter(rule => rule.isActive)
-        .forEach(rule => {
-          const modifier = parseFloat(rule.modifier);
-          const conditions = rule.conditions as any;
-
-          switch (rule.ruleType) {
-            case 'time_based':
-              if (conditions?.startHour !== undefined && conditions?.endHour !== undefined) {
-                if (hours >= conditions.startHour && hours < conditions.endHour) {
-                  totalMultiplier *= modifier;
-                }
-              }
-              break;
-
-            case 'day_based':
-              if (conditions?.days && Array.isArray(conditions.days)) {
-                if (conditions.days.includes(dayOfWeek)) {
-                  totalMultiplier *= modifier;
-                }
-              }
-              break;
-          }
-        });
-
-      // Calculate final price
-      const totalPrice = (basePrice * totalMultiplier * playerCount).toFixed(2);
+      const pricingBreakdown = await calculateDynamicPrice(teeTimeSlotId);
+      const totalPrice = (pricingBreakdown.finalPrice * playerCount).toFixed(2);
 
       // Create booking with server-calculated price
       const validated = insertBookingSchema.parse({
@@ -587,6 +550,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create weather data" });
+    }
+  });
+
+  // ── Pricing Engine Routes ────────────────────────────────────────────────
+
+  app.get('/api/pricing-engine/calculate/:teeTimeId', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      const teeTime = await storage.getTeeTimeSlot(req.params.teeTimeId);
+      if (!teeTime) {
+        return res.status(404).json({ message: "Tee time slot not found" });
+      }
+
+      if (!user?.courseId || teeTime.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { weatherCondition, temperature, overrideUtilization } = req.query;
+      const breakdown = await calculateDynamicPrice(req.params.teeTimeId, {
+        weatherCondition: weatherCondition as string | undefined,
+        temperature: temperature ? parseFloat(temperature as string) : undefined,
+        overrideUtilization: overrideUtilization ? parseFloat(overrideUtilization as string) : undefined,
+      });
+
+      res.json(breakdown);
+    } catch (error: any) {
+      console.error("Error calculating dynamic price:", error);
+      res.status(500).json({ message: error.message || "Failed to calculate price" });
+    }
+  });
+
+  app.post('/api/pricing-engine/recalculate', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.courseId) {
+        return res.status(400).json({ message: "User not associated with a course" });
+      }
+
+      if (!["admin", "manager"].includes(user.role)) {
+        return res.status(403).json({ message: "Only admins and managers can recalculate pricing" });
+      }
+
+      const { date, weatherCondition, temperature } = req.body;
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+
+      const results = await recalculateCoursePricing(user.courseId, date, {
+        weatherCondition,
+        temperature,
+      });
+
+      res.json({
+        recalculated: results.length,
+        date,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Error recalculating pricing:", error);
+      res.status(500).json({ message: error.message || "Failed to recalculate pricing" });
+    }
+  });
+
+  app.get('/api/pricing-engine/demo', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.courseId) {
+        return res.status(400).json({ message: "User not associated with a course" });
+      }
+
+      const demo = await runPricingDemo(user.courseId);
+
+      console.log("\n╔══════════════════════════════════════════════════════════════╗");
+      console.log("║              DYNAMIC PRICING ENGINE — DEMO OUTPUT           ║");
+      console.log("╚══════════════════════════════════════════════════════════════╝\n");
+
+      for (const scenario of demo.scenarios) {
+        console.log(`┌─ Scenario: ${scenario.label}`);
+        console.log(`│  Tee Time: ${scenario.breakdown.date} @ ${scenario.breakdown.timeSlot}`);
+        console.log(`│  Base Price: $${scenario.breakdown.basePrice.toFixed(2)}`);
+        console.log(`│`);
+        console.log(`│  FORMULA: Base × Time × Util × Weather × Lead`);
+        console.log(`│  ${scenario.mathExplanation}`);
+        console.log(`│`);
+        console.log(`│  Multipliers:`);
+        console.log(`│    Time of Day:  ${scenario.breakdown.timeOfDayMultiplier}x`);
+        console.log(`│    Utilization:  ${scenario.breakdown.utilizationMultiplier}x`);
+        console.log(`│    Weather:      ${scenario.breakdown.weatherMultiplier}x`);
+        console.log(`│    Lead Time:    ${scenario.breakdown.leadTimeMultiplier}x`);
+        console.log(`│`);
+        console.log(`│  Raw Price:   $${scenario.breakdown.rawCalculatedPrice.toFixed(2)}`);
+        if (scenario.breakdown.competitorCapApplied) {
+          console.log(`│  ⚠ CAPPED:    $${scenario.breakdown.finalPrice.toFixed(2)} (max competitor $${scenario.breakdown.maxCompetitorPrice?.toFixed(2)} + 10%)`);
+        } else {
+          console.log(`│  Final Price: $${scenario.breakdown.finalPrice.toFixed(2)}`);
+        }
+        console.log(`│`);
+        console.log(`│  Rules Applied:`);
+        for (const rule of scenario.breakdown.appliedRules) {
+          console.log(`│    • ${rule}`);
+        }
+        console.log(`└──────────────────────────────────────────────────────\n`);
+      }
+
+      res.json(demo);
+    } catch (error: any) {
+      console.error("Error running pricing demo:", error);
+      res.status(500).json({ message: error.message || "Failed to run pricing demo" });
     }
   });
 

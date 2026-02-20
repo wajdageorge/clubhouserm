@@ -25,7 +25,7 @@ import {
   type InsertWeatherData,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, desc, asc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, asc, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - mandatory for Replit Auth
@@ -76,6 +76,11 @@ export interface IStorage {
   // Weather operations
   getWeatherData(courseId: string, date?: string): Promise<WeatherData | undefined>;
   createWeatherData(weather: InsertWeatherData): Promise<WeatherData>;
+
+  // Pricing engine operations
+  getCompetitorRatesByDate(courseId: string, date: string): Promise<number[]>;
+  getUtilizationForDate(courseId: string, date: string): Promise<number>;
+  getTeeTimeSlotsCountForDate(courseId: string, date: string): Promise<{ total: number; booked: number }>;
 
   // Analytics operations
   getDashboardStats(courseId: string): Promise<{
@@ -327,6 +332,56 @@ export class DatabaseStorage implements IStorage {
   async createWeatherData(weather: InsertWeatherData): Promise<WeatherData> {
     const [newWeather] = await db.insert(weatherData).values(weather).returning();
     return newWeather;
+  }
+
+  async getCompetitorRatesByDate(courseId: string, date: string): Promise<number[]> {
+    const courseCompetitors = await db.select().from(competitors).where(eq(competitors.courseId, courseId));
+    if (courseCompetitors.length === 0) return [];
+
+    const competitorIds = courseCompetitors.map(c => c.id);
+    const rates: number[] = [];
+
+    for (const compId of competitorIds) {
+      const pricing = await db
+        .select()
+        .from(competitorPricing)
+        .where(and(eq(competitorPricing.competitorId, compId), eq(competitorPricing.date, date)));
+      for (const p of pricing) {
+        rates.push(parseFloat(p.price));
+      }
+    }
+
+    return rates;
+  }
+
+  async getUtilizationForDate(courseId: string, date: string): Promise<number> {
+    const counts = await this.getTeeTimeSlotsCountForDate(courseId, date);
+    if (counts.total === 0) return 0;
+    return (counts.booked / counts.total) * 100;
+  }
+
+  async getTeeTimeSlotsCountForDate(courseId: string, date: string): Promise<{ total: number; booked: number }> {
+    const allSlots = await db
+      .select()
+      .from(teeTimeSlots)
+      .where(and(eq(teeTimeSlots.courseId, courseId), eq(teeTimeSlots.date, date)));
+
+    const total = allSlots.length;
+    const booked = allSlots.filter(s => !s.isAvailable).length;
+
+    const confirmedBookings = await db
+      .select()
+      .from(bookings)
+      .innerJoin(teeTimeSlots, eq(bookings.teeTimeSlotId, teeTimeSlots.id))
+      .where(and(
+        eq(teeTimeSlots.courseId, courseId),
+        eq(teeTimeSlots.date, date),
+        eq(bookings.status, 'confirmed')
+      ));
+
+    const bookedFromBookings = confirmedBookings.length;
+
+    return { total, booked: Math.max(booked, bookedFromBookings) };
   }
 
   // Analytics operations

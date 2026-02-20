@@ -94,7 +94,7 @@ export const pricingRules = pgTable("pricing_rules", {
   courseId: varchar("course_id").notNull().references(() => courses.id),
   name: varchar("name").notNull(),
   description: text("description"),
-  ruleType: varchar("rule_type", { enum: ["time_based", "day_based", "weather_based", "utilization_based"] }).notNull(),
+  ruleType: varchar("rule_type", { enum: ["time_based", "day_based", "weather_based", "utilization_based", "lead_time"] }).notNull(),
   modifier: decimal("modifier", { precision: 5, scale: 2 }).notNull(), // e.g., 1.25 for +25%, 0.8 for -20%
   conditions: jsonb("conditions").notNull(), // Store rule conditions as JSON
   isActive: boolean("is_active").notNull().default(true),

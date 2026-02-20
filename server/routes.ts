@@ -13,6 +13,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { calculateDynamicPrice, recalculateCoursePricing, runPricingDemo } from "./utils/pricingEngine";
+import { scrapeCompetitor, runScraperDemo, normalizeMarketData, type APIScraperConfig, type DOMScraperConfig } from "./utils/marketScraper";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -664,6 +665,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error running pricing demo:", error);
       res.status(500).json({ message: error.message || "Failed to run pricing demo" });
+    }
+  });
+
+  // ── Market Scraper Routes ──────────────────────────────────────────────────
+
+  app.post('/api/scraper/run', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.courseId) {
+        return res.status(400).json({ message: "User not associated with a course" });
+      }
+      if (!["admin", "manager"].includes(user.role)) {
+        return res.status(403).json({ message: "Only admins and managers can run scrapers" });
+      }
+
+      const { competitorId, date, strategy, config } = req.body;
+      if (!competitorId || !date || !strategy || !config) {
+        return res.status(400).json({ message: "competitorId, date, strategy, and config are required" });
+      }
+
+      const competitor = await storage.getCompetitor(competitorId);
+      if (!competitor) {
+        return res.status(404).json({ message: "Competitor not found" });
+      }
+      if (competitor.courseId !== user.courseId) {
+        return res.status(403).json({ message: "Competitor belongs to a different course" });
+      }
+
+      const result = await scrapeCompetitor(competitor.name, date, config, strategy);
+
+      if (result.success && result.data.length > 0) {
+        for (const item of result.data) {
+          await storage.createCompetitorPricing({
+            competitorId,
+            date,
+            time: item.time,
+            price: item.price.toFixed(2),
+            holes: 18,
+            playerCount: 1,
+            scraped: true,
+          });
+        }
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error running scraper:", error);
+      res.status(500).json({ message: error.message || "Failed to run scraper" });
+    }
+  });
+
+  app.post('/api/scraper/normalize', isAuthenticated, async (req, res) => {
+    try {
+      const { rawTimes, rawPrices } = req.body;
+      if (!Array.isArray(rawTimes) || !Array.isArray(rawPrices)) {
+        return res.status(400).json({ message: "rawTimes and rawPrices arrays are required" });
+      }
+
+      const normalized = normalizeMarketData(rawTimes, rawPrices);
+      res.json({ normalized, inputCount: rawTimes.length, outputCount: normalized.length });
+    } catch (error: any) {
+      console.error("Error normalizing data:", error);
+      res.status(500).json({ message: error.message || "Failed to normalize data" });
+    }
+  });
+
+  app.get('/api/scraper/demo', isAuthenticated, async (req, res) => {
+    try {
+      const demo = runScraperDemo();
+      res.json(demo);
+    } catch (error: any) {
+      console.error("Error running scraper demo:", error);
+      res.status(500).json({ message: error.message || "Failed to run scraper demo" });
     }
   });
 

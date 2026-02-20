@@ -32,6 +32,8 @@ A comprehensive golf course revenue management system featuring dynamic pricing 
 - `client/src/components/theme-provider.tsx` - ThemeProvider context
 - `server/routes.ts` - API routes
 - `server/storage.ts` - Storage interface and implementation
+- `server/utils/pricingEngine.ts` - Dynamic pricing algorithm
+- `server/utils/marketScraper.ts` - Competitor scraping module (API, DOM, Cheerio strategies)
 - `shared/schema.ts` - Drizzle schema + Zod validation
 
 ## Dynamic Pricing Engine (`server/utils/pricingEngine.ts`)

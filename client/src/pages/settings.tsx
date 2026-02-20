@@ -5,8 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
+import { Plus, Users, CreditCard, Cloud, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,7 @@ import { insertCourseSchema, type Course } from "@shared/schema";
 const updateCourseSchema = insertCourseSchema.omit({ isActive: true });
 
 export default function Settings() {
+  useDocumentTitle("Settings", "Configure system settings and preferences");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("course");
@@ -348,14 +351,14 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <CardTitle>User Management</CardTitle>
                     <Button data-testid="button-add-user">
-                      <i className="fas fa-plus mr-2"></i>
+                      <Plus className="w-4 h-4 mr-2" />
                       Add User
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-12">
-                    <i className="fas fa-users text-4xl text-muted-foreground mb-3"></i>
+                    <Users className="w-10 h-10 text-muted-foreground mb-3 mx-auto" />
                     <p className="text-muted-foreground">
                       User management features will be available here
                     </p>
@@ -377,7 +380,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-[#6772E5] rounded-lg flex items-center justify-center">
-                          <i className="fab fa-stripe text-white"></i>
+                          <CreditCard className="w-5 h-5 text-white" />
                         </div>
                         <div>
                           <p className="font-medium">Stripe</p>
@@ -392,7 +395,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between p-4 border border-border rounded-lg opacity-50">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                          <i className="fas fa-cloud text-muted-foreground"></i>
+                          <Cloud className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
                           <p className="font-medium">Weather API</p>
@@ -407,7 +410,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between p-4 border border-border rounded-lg opacity-50">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                          <i className="fas fa-envelope text-muted-foreground"></i>
+                          <Mail className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
                           <p className="font-medium">Email Service</p>

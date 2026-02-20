@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
+import { DollarSign, CalendarCheck, TrendingUp, Percent } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Analytics() {
+  useDocumentTitle("Analytics", "Revenue analytics and performance insights");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [timeRange, setTimeRange] = useState("7days");
@@ -84,7 +87,7 @@ export default function Analytics() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-dollar-sign text-chart-1 text-xl"></i>
+                  <DollarSign className="w-5 h-5 text-chart-1" />
                 </div>
                 <Select value={timeRange} onValueChange={setTimeRange}>
                   <SelectTrigger className="w-24 h-8 text-xs" data-testid="select-time-range-revenue">
@@ -102,7 +105,7 @@ export default function Analytics() {
                 ${stats?.weeklyRevenue || "0.00"}
               </p>
               <div className="flex items-center mt-2 space-x-1">
-                <i className="fas fa-arrow-up text-chart-1 text-xs"></i>
+                <TrendingUp className="w-3 h-3 text-chart-1" />
                 <span className="text-chart-1 text-sm font-medium">15.3%</span>
                 <span className="text-muted-foreground text-sm">vs prev period</span>
               </div>
@@ -111,7 +114,7 @@ export default function Analytics() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-chart-2/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-calendar-check text-chart-2 text-xl"></i>
+                  <CalendarCheck className="w-5 h-5 text-chart-2" />
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Total Bookings</p>
@@ -119,7 +122,7 @@ export default function Analytics() {
                 {stats?.totalBookings || 0}
               </p>
               <div className="flex items-center mt-2 space-x-1">
-                <i className="fas fa-arrow-up text-chart-2 text-xs"></i>
+                <TrendingUp className="w-3 h-3 text-chart-2" />
                 <span className="text-chart-2 text-sm font-medium">12.5%</span>
                 <span className="text-muted-foreground text-sm">vs prev period</span>
               </div>
@@ -128,7 +131,7 @@ export default function Analytics() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-chart-line text-chart-3 text-xl"></i>
+                  <TrendingUp className="w-5 h-5 text-chart-3" />
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Avg Transaction</p>
@@ -136,7 +139,7 @@ export default function Analytics() {
                 ${stats?.averageBooking || "0.00"}
               </p>
               <div className="flex items-center mt-2 space-x-1">
-                <i className="fas fa-arrow-up text-chart-3 text-xs"></i>
+                <TrendingUp className="w-3 h-3 text-chart-3" />
                 <span className="text-chart-3 text-sm font-medium">7.8%</span>
                 <span className="text-muted-foreground text-sm">vs prev period</span>
               </div>
@@ -145,7 +148,7 @@ export default function Analytics() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-chart-4/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-percentage text-chart-4 text-xl"></i>
+                  <Percent className="w-5 h-5 text-chart-4" />
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Utilization Rate</p>
@@ -153,7 +156,7 @@ export default function Analytics() {
                 {stats?.utilization || 0}%
               </p>
               <div className="flex items-center mt-2 space-x-1">
-                <i className="fas fa-arrow-up text-chart-4 text-xs"></i>
+                <TrendingUp className="w-3 h-3 text-chart-4" />
                 <span className="text-chart-4 text-sm font-medium">3.2%</span>
                 <span className="text-muted-foreground text-sm">vs prev period</span>
               </div>

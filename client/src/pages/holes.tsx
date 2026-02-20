@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/table";
 
 export default function HoleInformation() {
+  useDocumentTitle("Hole Information", "View hole-by-hole details, yardages, and handicap information");
   const { user } = useAuth();
 
   const { data: course, isLoading } = useQuery({

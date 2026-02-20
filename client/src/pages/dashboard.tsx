@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import QuickStats from "@/components/dashboard/quick-stats";
@@ -13,6 +14,7 @@ import PricingEngine from "@/components/dashboard/pricing-engine";
 import DemandForecast from "@/components/dashboard/demand-forecast";
 
 export default function Dashboard() {
+  useDocumentTitle("Dashboard", "Manage your golf course operations, bookings, and revenue analytics");
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
 

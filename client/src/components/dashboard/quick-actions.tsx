@@ -1,58 +1,77 @@
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Plus, Tags, BarChart3, Users } from "lucide-react";
 
 export default function QuickActions() {
+  const [, setLocation] = useLocation();
+
   const actions = [
     {
-      icon: "fas fa-plus",
+      icon: Plus,
       label: "New Booking",
-      bgColor: "bg-primary/10",
-      iconColor: "text-primary",
-      testId: "button-new-booking"
+      description: "Create a tee time booking",
+      bgColor: "bg-emerald-500/10 dark:bg-emerald-500/20",
+      iconColor: "text-emerald-500",
+      testId: "button-new-booking",
+      route: "/tee-times",
     },
     {
-      icon: "fas fa-tags",
+      icon: Tags,
       label: "Update Pricing",
-      bgColor: "bg-chart-2/10",
-      iconColor: "text-chart-2",
-      testId: "button-update-pricing"
+      description: "Adjust pricing rules",
+      bgColor: "bg-lime-500/10 dark:bg-lime-500/20",
+      iconColor: "text-lime-500",
+      testId: "button-update-pricing",
+      route: "/pricing",
     },
     {
-      icon: "fas fa-chart-bar",
+      icon: BarChart3,
       label: "View Reports",
-      bgColor: "bg-chart-3/10",
-      iconColor: "text-chart-3",
-      testId: "button-view-reports"
+      description: "Analytics & insights",
+      bgColor: "bg-blue-500/10 dark:bg-blue-500/20",
+      iconColor: "text-blue-500",
+      testId: "button-view-reports",
+      route: "/analytics",
     },
     {
-      icon: "fas fa-users",
+      icon: Users,
       label: "Manage Staff",
-      bgColor: "bg-chart-4/10",
-      iconColor: "text-chart-4",
-      testId: "button-manage-staff"
-    }
+      description: "Team management",
+      bgColor: "bg-purple-500/10 dark:bg-purple-500/20",
+      iconColor: "text-purple-500",
+      testId: "button-manage-staff",
+      route: "/staff",
+    },
   ];
 
   return (
-    <Card className="p-6">
-      <CardHeader className="pb-4">
-        <CardTitle>Quick Actions</CardTitle>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {actions.map((action, index) => (
-            <Button
-              key={index}
-              variant="outline"
-              className="w-full flex items-center space-x-3 p-3 h-auto justify-start"
-              data-testid={action.testId}
-            >
-              <div className={`w-8 h-8 ${action.bgColor} rounded-lg flex items-center justify-center`}>
-                <i className={`${action.icon} ${action.iconColor} text-sm`}></i>
-              </div>
-              <span className="font-medium">{action.label}</span>
-            </Button>
-          ))}
+        <div className="space-y-2">
+          {actions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <Button
+                key={index}
+                variant="ghost"
+                className="w-full flex items-center gap-3 p-3 h-auto justify-start hover:bg-muted/80 transition-all duration-200"
+                onClick={() => setLocation(action.route)}
+                data-testid={action.testId}
+              >
+                <div className={`w-9 h-9 ${action.bgColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                  <Icon className={`w-4 h-4 ${action.iconColor}`} />
+                </div>
+                <div className="text-left">
+                  <span className="font-medium text-sm block">{action.label}</span>
+                  <span className="text-xs text-muted-foreground">{action.description}</span>
+                </div>
+              </Button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

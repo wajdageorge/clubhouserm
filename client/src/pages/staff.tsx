@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default function StaffManagement() {
+  useDocumentTitle("Staff Management", "Manage team members, roles, and permissions");
   const { user } = useAuth();
 
   const { data: users, isLoading } = useQuery({

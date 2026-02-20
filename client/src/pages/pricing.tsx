@@ -5,8 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
+import { DollarSign, TrendingUp, Percent, Plus, Pencil, Tags } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +23,7 @@ import { insertPricingRuleSchema, type PricingRule } from "@shared/schema";
 const createPricingRuleSchema = insertPricingRuleSchema.omit({ courseId: true });
 
 export default function Pricing() {
+  useDocumentTitle("Pricing", "Configure dynamic pricing rules and strategies");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -147,7 +150,7 @@ export default function Pricing() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-dollar-sign text-chart-1 text-xl"></i>
+                  <DollarSign className="w-5 h-5 text-chart-1" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Base Price</p>
@@ -159,7 +162,7 @@ export default function Pricing() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-2/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-chart-line text-chart-2 text-xl"></i>
+                  <TrendingUp className="w-5 h-5 text-chart-2" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Active Rules</p>
@@ -173,7 +176,7 @@ export default function Pricing() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-percentage text-chart-3 text-xl"></i>
+                  <Percent className="w-5 h-5 text-chart-3" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Adjustment</p>
@@ -190,7 +193,7 @@ export default function Pricing() {
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-rule">
-                      <i className="fas fa-plus mr-2"></i>
+                      <Plus className="w-4 h-4 mr-2" />
                       Create Rule
                     </Button>
                   </DialogTrigger>
@@ -340,7 +343,7 @@ export default function Pricing() {
                 </div>
               ) : !pricingRules || pricingRules.length === 0 ? (
                 <div className="text-center py-12">
-                  <i className="fas fa-tags text-4xl text-muted-foreground mb-3"></i>
+                  <Tags className="w-10 h-10 text-muted-foreground mb-3 mx-auto" />
                   <p className="text-muted-foreground" data-testid="text-no-rules">
                     No pricing rules configured yet
                   </p>
@@ -404,7 +407,7 @@ export default function Pricing() {
                               onClick={() => setEditingRule(rule)}
                               data-testid={`button-edit-${rule.id}`}
                             >
-                              <i className="fas fa-edit"></i>
+                              <Pencil className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>

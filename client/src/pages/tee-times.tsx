@@ -5,8 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
+import { Plus, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,7 @@ const updateTeeTimeSchema = z.object({
 });
 
 export default function TeeTimes() {
+  useDocumentTitle("Tee Times", "Manage tee time slots and availability");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -199,7 +202,7 @@ export default function TeeTimes() {
                   <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                     <DialogTrigger asChild>
                       <Button data-testid="button-create-tee-time">
-                        <i className="fas fa-plus mr-2"></i>
+                        <Plus className="w-4 h-4 mr-2" />
                         Create Tee Time
                       </Button>
                     </DialogTrigger>
@@ -337,7 +340,7 @@ export default function TeeTimes() {
                 </div>
               ) : !teeTimeSlots || teeTimeSlots.length === 0 ? (
                 <div className="text-center py-12">
-                  <i className="fas fa-calendar-alt text-4xl text-muted-foreground mb-3"></i>
+                  <CalendarDays className="w-10 h-10 text-muted-foreground mb-3 mx-auto" />
                   <p className="text-muted-foreground" data-testid="text-no-slots">
                     No tee time slots found for {selectedDate}
                   </p>
@@ -394,7 +397,7 @@ export default function TeeTimes() {
                               onClick={() => setEditingSlot(slot)}
                               data-testid={`button-edit-${slot.id}`}
                             >
-                              <i className="fas fa-edit"></i>
+                              <Pencil className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -406,7 +409,7 @@ export default function TeeTimes() {
                               }}
                               data-testid={`button-delete-${slot.id}`}
                             >
-                              <i className="fas fa-trash text-destructive"></i>
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>

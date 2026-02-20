@@ -5,8 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
+import { Building2, BarChart3, MapPin, Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ const createCompetitorSchema = insertCompetitorSchema.omit({ courseId: true });
 const updateCompetitorSchema = insertCompetitorSchema.omit({ courseId: true, isActive: true });
 
 export default function Competitors() {
+  useDocumentTitle("Competitors", "Monitor competitor pricing and market intelligence");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -204,7 +207,7 @@ export default function Competitors() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-building text-chart-1 text-xl"></i>
+                  <Building2 className="w-5 h-5 text-chart-1" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Competitors</p>
@@ -218,7 +221,7 @@ export default function Competitors() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-2/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-chart-bar text-chart-2 text-xl"></i>
+                  <BarChart3 className="w-5 h-5 text-chart-2" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Active Monitoring</p>
@@ -232,7 +235,7 @@ export default function Competitors() {
             <Card className="p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-map-marker-alt text-chart-3 text-xl"></i>
+                  <MapPin className="w-5 h-5 text-chart-3" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Distance</p>
@@ -253,7 +256,7 @@ export default function Competitors() {
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-add-competitor">
-                      <i className="fas fa-plus mr-2"></i>
+                      <Plus className="w-4 h-4 mr-2" />
                       Add Competitor
                     </Button>
                   </DialogTrigger>
@@ -387,7 +390,7 @@ export default function Competitors() {
                 </div>
               ) : !competitors || competitors.length === 0 ? (
                 <div className="text-center py-12">
-                  <i className="fas fa-search text-4xl text-muted-foreground mb-3"></i>
+                  <Search className="w-10 h-10 text-muted-foreground mb-3 mx-auto" />
                   <p className="text-muted-foreground" data-testid="text-no-competitors">
                     No competitor courses tracked yet
                   </p>
@@ -459,7 +462,7 @@ export default function Competitors() {
                               onClick={() => setEditingCompetitor(competitor)}
                               data-testid={`button-edit-${competitor.id}`}
                             >
-                              <i className="fas fa-edit"></i>
+                              <Pencil className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -471,7 +474,7 @@ export default function Competitors() {
                               }}
                               data-testid={`button-delete-${competitor.id}`}
                             >
-                              <i className="fas fa-trash text-destructive"></i>
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>

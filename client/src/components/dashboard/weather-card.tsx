@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sun, Wind, Droplets, Cloud } from "lucide-react";
 
 export default function WeatherCard() {
   const { user } = useAuth();
@@ -12,13 +13,13 @@ export default function WeatherCard() {
 
   if (isLoading) {
     return (
-      <Card className="p-6">
-        <CardHeader>
-          <CardTitle>Weather Conditions</CardTitle>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Weather</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse">
-            <div className="w-16 h-16 bg-muted rounded-full mx-auto mb-3"></div>
+            <div className="w-14 h-14 bg-muted rounded-full mx-auto mb-3"></div>
             <div className="h-8 bg-muted rounded mb-2"></div>
             <div className="h-4 bg-muted rounded"></div>
           </div>
@@ -27,42 +28,50 @@ export default function WeatherCard() {
     );
   }
 
-  // Default weather data if no weather found
   const currentWeather = weather || {
     temperature: 72,
     condition: "Sunny",
     windSpeed: 5,
-    humidity: 45
+    humidity: 45,
   };
 
+  const getWeatherIcon = (condition: string) => {
+    if (condition.toLowerCase().includes("cloud")) return Cloud;
+    return Sun;
+  };
+
+  const WeatherIcon = getWeatherIcon(currentWeather.condition);
+
   return (
-    <Card className="p-6">
-      <CardHeader className="pb-4">
-        <CardTitle>Weather Conditions</CardTitle>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Weather</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-yellow-300 to-orange-400 rounded-full flex items-center justify-center">
-            <i className="fas fa-sun text-white text-2xl"></i>
+          <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-br from-amber-300 to-orange-400 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-300/20 dark:shadow-amber-600/10">
+            <WeatherIcon className="w-7 h-7 text-white" />
           </div>
-          <p className="text-2xl font-bold" data-testid="text-temperature">
+          <p className="text-3xl font-bold tracking-tight" data-testid="text-temperature">
             {currentWeather.temperature}°F
           </p>
-          <p className="text-muted-foreground" data-testid="text-condition">
+          <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-condition">
             {currentWeather.condition}
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Wind</p>
-              <p className="font-medium" data-testid="text-wind">
-                {currentWeather.windSpeed} mph
-              </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 justify-center bg-muted/50 rounded-lg py-2 px-3">
+              <Wind className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="text-left">
+                <p className="text-xs text-muted-foreground">Wind</p>
+                <p className="text-sm font-semibold" data-testid="text-wind">{currentWeather.windSpeed} mph</p>
+              </div>
             </div>
-            <div>
-              <p className="text-muted-foreground">Humidity</p>
-              <p className="font-medium" data-testid="text-humidity">
-                {currentWeather.humidity}%
-              </p>
+            <div className="flex items-center gap-2 justify-center bg-muted/50 rounded-lg py-2 px-3">
+              <Droplets className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="text-left">
+                <p className="text-xs text-muted-foreground">Humidity</p>
+                <p className="text-sm font-semibold" data-testid="text-humidity">{currentWeather.humidity}%</p>
+              </div>
             </div>
           </div>
         </div>

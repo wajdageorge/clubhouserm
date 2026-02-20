@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Phone, Mail, Calendar, Users, Flag } from "lucide-react";
 
 export default function CourseDetails() {
+  useDocumentTitle("Course Details", "View and manage course information and specifications");
   const { user } = useAuth();
 
   const { data: course, isLoading } = useQuery({

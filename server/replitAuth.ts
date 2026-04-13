@@ -7,6 +7,9 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { db } from "./db";
+import { courses } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -54,9 +57,7 @@ function updateUserSession(
   user.expires_at = user.claims?.exp;
 }
 
-async function upsertUser(
-  claims: any,
-) {
+async function upsertUser(claims: any) {
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
@@ -64,6 +65,23 @@ async function upsertUser(
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+
+  // Auto-assign to first active course if the user has no course yet.
+  // This lets any Replit user immediately see the seeded demo data.
+  const user = await storage.getUser(claims["sub"]);
+  if (user && !user.courseId) {
+    const [firstCourse] = await db
+      .select()
+      .from(courses)
+      .where(eq(courses.isActive, true))
+      .limit(1);
+    if (firstCourse) {
+      await storage.updateUser(user.id, {
+        courseId: firstCourse.id,
+        role: "admin",
+      });
+    }
+  }
 }
 
 export async function setupAuth(app: Express) {

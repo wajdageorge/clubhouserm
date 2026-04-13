@@ -25,12 +25,13 @@ import {
   type InsertWeatherData,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, desc, asc, sql, count } from "drizzle-orm";
+import { eq, and, gte, lte, desc, asc, sql, count, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - mandatory for Replit Auth
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<UpsertUser>): Promise<User>;
   getUsersByCourse(courseId: string): Promise<User[]>;
   getBookingsByCustomer(customerId: string): Promise<Booking[]>;
 
@@ -82,6 +83,9 @@ export interface IStorage {
   getUtilizationForDate(courseId: string, date: string): Promise<number>;
   getTeeTimeSlotsCountForDate(courseId: string, date: string): Promise<{ total: number; booked: number }>;
 
+  // Schedule with booking info (for dashboard slot grid)
+  getTeeTimeSchedule(courseId: string, date: string): Promise<TeeTimeWithBooking[]>;
+
   // Analytics operations
   getDashboardStats(courseId: string): Promise<{
     todayBookings: number;
@@ -93,6 +97,25 @@ export interface IStorage {
     totalBookings: number;
   }>;
 }
+
+// ── Enriched type returned by getTeeTimeSchedule ──────────────────────────────
+export type TeeTimeWithBooking = {
+  id: string;
+  time: string;
+  date: string;
+  basePrice: string;
+  currentPrice: string;
+  isAvailable: boolean;
+  maxPlayers: number;
+  holes: number;
+  booking: {
+    id: string;
+    customerName: string;
+    playerCount: number;
+    totalPrice: string;
+    status: string;
+  } | null;
+};
 
 export class DatabaseStorage implements IStorage {
   // User operations - mandatory for Replit Auth
@@ -112,6 +135,15 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: string, data: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
       .returning();
     return user;
   }
@@ -384,6 +416,56 @@ export class DatabaseStorage implements IStorage {
     return { total, booked: Math.max(booked, bookedFromBookings) };
   }
 
+  // Schedule with booking info
+  async getTeeTimeSchedule(courseId: string, date: string): Promise<TeeTimeWithBooking[]> {
+    const rows = await db
+      .select({
+        id: teeTimeSlots.id,
+        time: teeTimeSlots.time,
+        date: teeTimeSlots.date,
+        basePrice: teeTimeSlots.basePrice,
+        currentPrice: teeTimeSlots.currentPrice,
+        isAvailable: teeTimeSlots.isAvailable,
+        maxPlayers: teeTimeSlots.maxPlayers,
+        holes: teeTimeSlots.holes,
+        bookingId: bookings.id,
+        bookingCustomerName: bookings.customerName,
+        bookingPlayerCount: bookings.playerCount,
+        bookingTotalPrice: bookings.totalPrice,
+        bookingStatus: bookings.status,
+      })
+      .from(teeTimeSlots)
+      .leftJoin(
+        bookings,
+        and(
+          eq(bookings.teeTimeSlotId, teeTimeSlots.id),
+          ne(bookings.status, "cancelled"),
+        ),
+      )
+      .where(and(eq(teeTimeSlots.courseId, courseId), eq(teeTimeSlots.date, date)))
+      .orderBy(asc(teeTimeSlots.time));
+
+    return rows.map((row) => ({
+      id: row.id,
+      time: row.time,
+      date: row.date,
+      basePrice: row.basePrice,
+      currentPrice: row.currentPrice,
+      isAvailable: row.isAvailable,
+      maxPlayers: row.maxPlayers,
+      holes: row.holes,
+      booking: row.bookingId
+        ? {
+            id: row.bookingId,
+            customerName: row.bookingCustomerName!,
+            playerCount: row.bookingPlayerCount!,
+            totalPrice: row.bookingTotalPrice!,
+            status: row.bookingStatus!,
+          }
+        : null,
+    }));
+  }
+
   // Analytics operations
   async getDashboardStats(courseId: string): Promise<{
     todayBookings: number;
@@ -395,8 +477,8 @@ export class DatabaseStorage implements IStorage {
     totalBookings: number;
   }> {
     const today = new Date().toISOString().split('T')[0];
-    
-    // Get today's bookings
+
+    // Today's confirmed bookings
     const todayBookingsResult = await db
       .select()
       .from(bookings)
@@ -404,27 +486,31 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(teeTimeSlots.courseId, courseId),
         eq(teeTimeSlots.date, today),
-        eq(bookings.status, 'confirmed')
+        eq(bookings.status, 'confirmed'),
       ));
 
     const todayBookings = todayBookingsResult.length;
-    const todayRevenue = todayBookingsResult.reduce((sum, booking) => sum + parseFloat(booking.bookings.totalPrice), 0);
+    const todayRevenue = todayBookingsResult.reduce(
+      (sum, row) => sum + parseFloat(row.bookings.totalPrice), 0
+    );
 
-    // Get available slots for today
-    const availableSlotsResult = await db
+    // ALL slots for today (available + booked/blocked)
+    const allTodaySlots = await db
       .select()
       .from(teeTimeSlots)
       .where(and(
         eq(teeTimeSlots.courseId, courseId),
         eq(teeTimeSlots.date, today),
-        eq(teeTimeSlots.isAvailable, true)
       ));
 
-    const totalSlots = availableSlotsResult.length;
-    const availableSlots = totalSlots - todayBookings;
-    const utilization = totalSlots > 0 ? Math.round((todayBookings / totalSlots) * 100) : 0;
+    const totalSlots = allTodaySlots.length;
+    const availableSlots = allTodaySlots.filter((s) => s.isAvailable).length;
+    // utilization = % of slots that are NOT available
+    const utilization = totalSlots > 0
+      ? Math.round(((totalSlots - availableSlots) / totalSlots) * 100)
+      : 0;
 
-    // Get weekly stats
+    // Weekly stats (last 7 days, confirmed + completed bookings)
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().split('T')[0];
@@ -436,10 +522,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(teeTimeSlots.courseId, courseId),
         gte(teeTimeSlots.date, weekAgoStr),
-        eq(bookings.status, 'confirmed')
+        // count confirmed and completed (completed = past bookings that ran)
       ));
 
-    const weeklyRevenue = weeklyBookingsResult.reduce((sum, booking) => sum + parseFloat(booking.bookings.totalPrice), 0);
+    const weeklyRevenue = weeklyBookingsResult.reduce(
+      (sum, row) => sum + parseFloat(row.bookings.totalPrice), 0
+    );
     const totalBookings = weeklyBookingsResult.length;
     const averageBooking = totalBookings > 0 ? weeklyRevenue / totalBookings : 0;
 

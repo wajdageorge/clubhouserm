@@ -104,6 +104,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tee time schedule with booking info (for dashboard slot grid)
+  app.get('/api/courses/:courseId/tee-times-schedule', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.courseId || user.courseId !== req.params.courseId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const schedule = await storage.getTeeTimeSchedule(req.params.courseId, date);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error fetching tee time schedule:", error);
+      res.status(500).json({ message: "Failed to fetch schedule" });
+    }
+  });
+
   // Tee time routes
   app.get('/api/courses/:courseId/tee-times', isAuthenticated, async (req, res) => {
     try {
